@@ -48,6 +48,31 @@ fn window_title_is_sent_only_when_it_changes() {
     assert_eq!(titles(&mut app), 1);
 }
 
+/// iPadOS draws its status bar and home indicator over the window: the toolbar must start below
+/// the top safe area and the status bar must end above the bottom one, in both orientations.
+#[test]
+fn safe_area_keeps_the_toolbar_and_status_bar_clear() {
+    for (size, top, bottom) in [(egui::vec2(820.0, 1180.0), 24.0, 20.0), (egui::vec2(1180.0, 820.0), 24.0, 20.0)] {
+        let ctx = egui::Context::default();
+        let mut app = app();
+        let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+        let insets = egui::SafeAreaInsets(egui::epaint::MarginF32 { top, right: 0.0, bottom, left: 0.0 });
+        for _ in 0..4 {
+            let input = egui::RawInput { screen_rect: Some(viewport), safe_area_insets: Some(insets), ..Default::default() };
+            ctx.run_ui(input, |ui| {
+                app.logic(ui.ctx());
+                app.ui(ui);
+            })
+            .drop_without_applying_deltas();
+        }
+        let scope = ctx.viewport_id().root_ui_id().with("safe_area");
+        let title = egui::PanelState::load(&ctx, scope.with("title_bar")).expect("the title bar was laid out");
+        let status = egui::PanelState::load(&ctx, scope.with("status")).expect("the status bar was laid out");
+        assert_eq!(title.outer_rect.top(), top, "the toolbar starts below the status bar");
+        assert_eq!(status.outer_rect.bottom(), viewport.bottom() - bottom, "the status bar ends above the home indicator");
+    }
+}
+
 /// #3634: a NUL in the document title never reaches the window title (X11 needs a C string)
 /// or the suggested file name.
 #[test]

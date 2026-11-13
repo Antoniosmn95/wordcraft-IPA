@@ -704,12 +704,16 @@ pub fn screen_bar(app: &mut WordApp, ui: &mut Ui, screen: Screen) {
 /// Focus: the ribbon dropped down from the bar, drawn over the page so the page doesn't move. A
 /// click on the page puts it away; Focus stays on.
 pub fn focus_ribbon(app: &mut WordApp, ctx: &egui::Context) {
-    let width = ctx.content_rect().width();
-    egui::Area::new(egui::Id::unique("focus_ribbon")).fixed_pos(pos2(0.0, SCREEN_BAR_HEIGHT)).order(egui::Order::Middle).show(ctx, |ui| {
-        ui.set_width(width);
-        ui.set_max_width(width);
-        crate::ribbon::show(app, ui);
-    });
+    let content = ctx.content_rect();
+    let width = content.width();
+    egui::Area::new(egui::Id::unique("focus_ribbon"))
+        .fixed_pos(pos2(content.min.x, content.min.y + SCREEN_BAR_HEIGHT))
+        .order(egui::Order::Middle)
+        .show(ctx, |ui| {
+            ui.set_width(width);
+            ui.set_max_width(width);
+            crate::ribbon::show(app, ui);
+        });
     let click = ctx.input(|i| if i.pointer.any_click() { i.pointer.interact_pos() } else { None });
     if let Some(pos) = click
         && app.canvas.viewport.is_some_and(|v| v.contains(pos))

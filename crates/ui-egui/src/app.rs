@@ -25,6 +25,23 @@ pub(crate) use commands::works_without_document;
 pub(crate) use frame::STATUS_MS;
 pub(crate) use input::control_click_as_secondary;
 
+/// Fill the strips the system draws over (the status bar, camera housing, home indicator) so the
+/// window has no bare gaps when the chrome is inset to [`egui::Context::content_rect`]. The top
+/// strip takes the title bar's colour and the bottom the status bar's, matching the chrome that
+/// would otherwise run under them.
+fn paint_safe_area(ui: &egui::Ui, viewport: egui::Rect, content: egui::Rect, t: &theme::Tokens) {
+    let painter = ui.painter();
+    painter.rect_filled(viewport, 0.0, t.canvas);
+    if content.top() > viewport.top() {
+        let top = egui::Rect::from_min_max(viewport.min, egui::pos2(viewport.max.x, content.top()));
+        painter.rect_filled(top, 0.0, t.title_bar);
+    }
+    if content.bottom() < viewport.bottom() {
+        let bottom = egui::Rect::from_min_max(egui::pos2(viewport.min.x, content.bottom()), viewport.max);
+        painter.rect_filled(bottom, 0.0, t.status_bar);
+    }
+}
+
 impl WordApp {
     /// Creates the app: adopts the system locale, then initializes the document session, UI state,
     /// services, printing, canvas, dialogs, previews, control and screenshot state, font and theme
@@ -423,8 +440,25 @@ impl WordApp {
 
     /// Lay out the windows: on the desktop each open document's in its own native window
     /// ([`windows`]), on the web the one window.
+    ///
+    /// On iPadOS the system draws its status bar, camera housing and home indicator over the
+    /// window. The root [`egui::Ui`] covers that whole viewport, so the chrome is laid out in
+    /// [`egui::Context::content_rect`] and the strips underneath the system bars keep the title
+    /// and status bar colours. Without this the top toolbar draws under the status bar.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         self.clear_raw_scroll_replay();
+        let viewport = ui.ctx().viewport_rect();
+        let content = ui.ctx().content_rect();
+        if content == viewport {
+            self.ui_content(ui);
+        } else {
+            let t = theme::Tokens::get(ui.ctx());
+            paint_safe_area(ui, viewport, content, &t);
+            ui.scope_builder(egui::UiBuilder::new().id_salt("safe_area").max_rect(content), |ui| self.ui_content(ui));
+        }
+    }
+
+    fn ui_content(&mut self, ui: &mut egui::Ui) {
         if self.windows.native() {
             self.windows_ui(ui);
         } else {
