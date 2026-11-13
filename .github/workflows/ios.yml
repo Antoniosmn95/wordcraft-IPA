@@ -1,0 +1,99 @@
+# Builds the native iPadOS app (Rust static library + Swift/UIKit host) on a macOS runner and
+# uploads an unsigned IPA. Signing and installation are done by the person with iLoader (or a
+# development team's certificate); this workflow cannot and does not sign.
+name: iPadOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/wordcraft-ios/**"
+      - "ios/**"
+      - "crates/**"
+      - "assets/**"
+      - ".github/workflows/ios.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "apps/wordcraft-ios/**"
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ipados-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ipa:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      # iOS cannot read the system font files, so the app carries its own faces. The Arabic
+      # face is what makes Arabic and Persian text render and join instead of showing boxes.
+      - name: Check out craft-fonts
+        uses: storytold/craft-common-actions/actions/checkout-craft-fonts@main
+        with:
+          ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ipados-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ipados-cargo-
+
+      - name: Build Rust static library
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
+        run: cargo build --release -p wordcraft-ios --target aarch64-apple-ios --locked
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml --project ios
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project ios/WordCraft.xcodeproj \
+            -scheme WordCraft \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/Build/Products/Release-iphoneos/WordCraft.app build/Payload/
+          cd build
+          zip -qry WordCraft-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WordCraft-unsigned-ipa
+          path: build/WordCraft-unsigned.ipa
+          if-no-files-found: error

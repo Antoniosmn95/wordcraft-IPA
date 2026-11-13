@@ -1,0 +1,43 @@
+[package]
+name = "wordcraft-ios"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "WordCraft for iPadOS: native Rust engine and egui front end, hosted by a Swift/UIKit bridge"
+
+# The C entry point below needs `#[unsafe(no_mangle)]` so Swift can call it. That is an ABI
+# marker, not unsafe code; every other lint is the workspace's, and unsafe code stays denied.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+cognitive_complexity = "deny"
+wildcard_imports = "deny"
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "deny"
+type_complexity = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+
+[lib]
+name = "wordcraft_ios"
+crate-type = ["staticlib", "rlib"]
+
+[target.'cfg(target_os = "ios")'.dependencies]
+wordcraft-doc = { workspace = true }
+wordcraft-engine = { workspace = true }
+wordcraft-fonts = { workspace = true }
+wordcraft-control-key = { workspace = true }
+wordcraft-proof = { workspace = true }
+wordcraft-ui-egui = { workspace = true }
+eframe = { workspace = true, default-features = false, features = ["default_fonts", "wgpu", "links"] }
+egui = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+winit = "0.30"

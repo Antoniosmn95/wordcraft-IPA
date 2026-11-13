@@ -1,0 +1,15 @@
+*~
+plan/
+/target
+/dist
+/corpus
+/log
+.DS_Store
+/.claude/
+/target-*/
+/craft-fonts/
+/ios/App/Info.plist
+/WordCraft.xcodeproj
+/ios/WordCraft.xcodeproj
+/ios/build
+/ios/App/Generated
