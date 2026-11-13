@@ -43,6 +43,13 @@ jobs:
         with:
           targets: aarch64-apple-ios
 
+      # iOS cannot read the system font files, so the app carries its own faces. The Arabic
+      # face is what makes Arabic and Persian text render and join instead of showing boxes.
+      - name: Check out craft-fonts
+        uses: storytold/craft-common-actions/actions/checkout-craft-fonts@main
+        with:
+          ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -54,6 +61,9 @@ jobs:
           restore-keys: ipados-cargo-
 
       - name: Build Rust static library
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
         run: cargo build --release -p wordcraft-ios --target aarch64-apple-ios --locked
 
       - name: Install XcodeGen
